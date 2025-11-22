@@ -1,737 +1,942 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="UTF-8" />
-  <title>Türkçe Voice QA Agent</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Azure Türkçe Asistan</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-  <style>
-    :root {
-      --bg: #050816;
-      --bg-card: #0f172a;
-      --bg-card-alt: #020617;
-      --accent: #22c55e;
-      --accent-soft: rgba(34, 197, 94, 0.12);
-      --accent-dark: #16a34a;
-      --text: #e5e7eb;
-      --text-muted: #9ca3af;
-      --border: #1f2937;
-      --danger: #ef4444;
-    }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
-        "Segoe UI", sans-serif;
-    }
+        .chat-container {
+            background: #1a1a2e;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            max-width: 900px;
+            width: 100%;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(0, 149, 255, 0.2);
+        }
 
-    body {
-      min-height: 100vh;
-      background: radial-gradient(circle at top, #1d283a 0, #020617 40%, #000 100%);
-      color: var(--text);
-      display: flex;
-      justify-content: center;   /* Sadece yatayda ortala, dikeyde değil */
-    }
+        .chat-header {
+            background: linear-gradient(135deg, #0078d4 0%, #004e8c 100%);
+            color: white;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 4px 20px rgba(0, 120, 212, 0.3);
+        }
 
-    /* İçerik yukarıya yakın, biraz daha geniş */
-    .app-wrapper {
-      width: 100%;
-      max-width: 1200px;
-      padding: 32px 32px 40px;
-      margin: 32px auto 0;
-    }
+        .chat-header-avatar {
+            width: 50px;
+            height: 50px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
 
-    @media (max-width: 960px) {
-      .app-wrapper {
-        padding: 24px 16px 32px;
-        margin-top: 16px;
-      }
-    }
+        .chat-header-info h1 {
+            font-size: 1.4em;
+            margin-bottom: 3px;
+            font-weight: 600;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
 
-    .app-header {
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-      align-items: flex-start;
-      margin-bottom: 24px;
-    }
+        .chat-header-info p {
+            font-size: 0.85em;
+            opacity: 0.9;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
 
-    .title-block h1 {
-      font-size: 28px;
-      letter-spacing: 0.04em;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+        .azure-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+        }
 
-    .title-pill {
-      font-size: 12px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid rgba(55, 65, 81, 0.8);
-      color: var(--text-muted);
-    }
+        .api-config-toggle {
+            margin-left: auto;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
 
-    .subtitle {
-      font-size: 14px;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
+        .api-config-toggle:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-2px);
+        }
 
-    .badge-row {
-      margin-top: 10px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
+        .api-config {
+            background: #16213e;
+            padding: 15px 30px;
+            display: none;
+            border-bottom: 1px solid rgba(0, 149, 255, 0.2);
+        }
 
-    .badge {
-      font-size: 11px;
-      letter-spacing: 0.03em;
-      text-transform: uppercase;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: rgba(31, 41, 55, 0.7);
-      border: 1px solid rgba(55, 65, 81, 0.9);
-      color: var(--text-muted);
-    }
+        .api-config.show {
+            display: block;
+        }
 
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: var(--accent);
-      box-shadow: 0 0 12px rgba(34, 197, 94, 0.85);
-    }
+        .api-config label {
+            color: #8ab4f8;
+            font-size: 0.9em;
+            display: block;
+            margin-bottom: 5px;
+        }
 
-    .status-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 12px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: rgba(22, 101, 52, 0.18);
-      border: 1px solid rgba(34, 197, 94, 0.4);
-      color: #bbf7d0;
-    }
+        .api-config input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid rgba(0, 149, 255, 0.3);
+            border-radius: 8px;
+            font-size: 0.9em;
+            background: #0f1419;
+            color: white;
+            transition: border-color 0.3s;
+        }
 
-    .layout {
-      display: grid;
-      grid-template-columns: 3fr 2fr;
-      gap: 18px;
-      margin-top: 8px; /* header ile içerik arasını biraz sıklaştır */
-    }
+        .api-config input:focus {
+            outline: none;
+            border-color: #0078d4;
+            box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1);
+        }
 
-    @media (max-width: 960px) {
-      .layout {
-        grid-template-columns: 1fr;
-      }
-      .app-header {
-        flex-direction: column;
-      }
-    }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 30px;
+            background: #0f1419;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
 
-    .card {
-      border-radius: 18px;
-      border: 1px solid rgba(31, 41, 55, 0.9);
-      background: linear-gradient(
-        145deg,
-        rgba(15, 23, 42, 0.98),
-        rgba(15, 23, 42, 0.92)
-      );
-      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.85);
-      padding: 18px 18px 16px;
-      backdrop-filter: blur(18px);
-    }
+        .message {
+            display: flex;
+            gap: 12px;
+            animation: messageSlide 0.3s ease-out;
+        }
 
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-    }
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
 
-    .card-title {
-      font-size: 15px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+        .message.user {
+            flex-direction: row-reverse;
+        }
 
-    .pill-mini {
-      font-size: 11px;
-      padding: 2px 7px;
-      border-radius: 999px;
-      background: rgba(15, 23, 42, 0.9);
-      border: 1px solid rgba(55, 65, 81, 0.8);
-      color: var(--text-muted);
-    }
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
 
-    .card-desc {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-bottom: 10px;
-    }
+        .message.user .message-avatar {
+            background: linear-gradient(135deg, #0078d4 0%, #004e8c 100%);
+            box-shadow: 0 4px 15px rgba(0, 120, 212, 0.3);
+        }
 
-    textarea {
-      width: 100%;
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      background: radial-gradient(circle at top left, #020617 0, #020617 45%, #030712 100%);
-      color: var(--text);
-      font-size: 14px;
-      padding: 10px 12px;
-      resize: vertical;
-      min-height: 90px;
-      outline: none;
-      transition: border 0.16s ease, box-shadow 0.16s ease, background 0.18s ease;
-    }
+        .message.assistant .message-avatar {
+            background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+            box-shadow: 0 4px 15px rgba(26, 115, 232, 0.3);
+        }
 
-    textarea:focus {
-      border-color: rgba(34, 197, 94, 0.8);
-      box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.6);
-      background: radial-gradient(circle at top left, #020617 0, #020617 40%, #020617 100%);
-    }
+        .message-content {
+            max-width: 70%;
+            padding: 15px 20px;
+            border-radius: 18px;
+            line-height: 1.6;
+            word-wrap: break-word;
+        }
 
-    .btn-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-top: 10px;
-      gap: 10px;
-    }
+        .message.user .message-content {
+            background: linear-gradient(135deg, #0078d4 0%, #005a9e 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0, 120, 212, 0.2);
+        }
 
-    .btn-primary {
-      border: none;
-      border-radius: 999px;
-      padding: 9px 16px;
-      font-size: 14px;
-      font-weight: 500;
-      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-      color: #021110;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      box-shadow:
-        0 0 12px rgba(34, 197, 94, 0.4),
-        0 16px 36px rgba(22, 163, 74, 0.50);
-      transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
-    }
+        .message.assistant .message-content {
+            background: #1a1a2e;
+            color: #e8eaed;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            border-bottom-left-radius: 4px;
+            border: 1px solid rgba(0, 149, 255, 0.2);
+        }
 
-    .btn-primary:hover {
-      transform: translateY(-1px);
-      filter: brightness(1.05);
-      box-shadow:
-        0 3px 16px rgba(34, 197, 94, 0.6),
-        0 20px 40px rgba(22, 163, 74, 0.55);
-    }
+        .message-audio {
+            margin-top: 10px;
+            width: 100%;
+        }
 
-    .btn-primary:active {
-      transform: translateY(0px) scale(0.99);
-      box-shadow: 0 6px 16px rgba(22, 163, 74, 0.5);
-    }
+        .message-audio audio {
+            width: 100%;
+            height: 40px;
+            filter: invert(0.9) hue-rotate(180deg);
+        }
 
-    .btn-secondary {
-      border-radius: 999px;
-      padding: 8px 14px;
-      font-size: 13px;
-      border: 1px solid rgba(55, 65, 81, 0.9);
-      background: rgba(15, 23, 42, 0.8);
-      color: var(--text-muted);
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      transition: background 0.16s ease, border 0.16s ease, transform 0.12s ease;
-    }
+        .message-contexts {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(0, 149, 255, 0.2);
+        }
 
-    .btn-secondary:hover {
-      background: rgba(30, 64, 175, 0.24);
-      border-color: rgba(59, 130, 246, 0.8);
-      transform: translateY(-1px);
-    }
+        .message-contexts-title {
+            font-size: 0.85em;
+            color: #8ab4f8;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
 
-    .btn-secondary.recording {
-      color: #fecaca;
-      border-color: rgba(248, 113, 113, 0.9);
-      background: radial-gradient(circle at top left, #450a0a 0, #111827 60%);
-      box-shadow: 0 0 18px rgba(239, 68, 68, 0.8);
-      animation: pulse 1.3s infinite;
-    }
+        .context-item {
+            background: rgba(0, 120, 212, 0.1);
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            border-radius: 8px;
+            font-size: 0.85em;
+            border-left: 3px solid #0078d4;
+            color: #c9d1d9;
+        }
 
-    @keyframes pulse {
-      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
-      70% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-    }
+        .typing-indicator {
+            display: none;
+            padding: 15px 20px;
+            background: #1a1a2e;
+            border-radius: 18px;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            width: fit-content;
+            border: 1px solid rgba(0, 149, 255, 0.2);
+        }
 
-    .btn-secondary .dot {
-      width: 9px;
-      height: 9px;
-      border-radius: 999px;
-      background: #f87171;
-    }
+        .typing-indicator.show {
+            display: block;
+        }
 
-    .btn-secondary.recording .dot {
-      background: #fee2e2;
-    }
+        .typing-dots {
+            display: flex;
+            gap: 6px;
+        }
 
-    .info-text {
-      font-size: 11px;
-      color: var(--text-muted);
-    }
+        .typing-dots span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #0078d4;
+            animation: typing 1.4s infinite;
+            box-shadow: 0 0 10px rgba(0, 120, 212, 0.5);
+        }
 
-    .answer-block {
-      margin-top: 14px;
-      padding-top: 10px;
-      border-top: 1px dashed rgba(55, 65, 81, 0.75);
-    }
+        .typing-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
 
-    .answer-label {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-    }
+        .typing-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
 
-    .answer-text {
-      font-size: 14px;
-      line-height: 1.6;
-      color: var(--text);
-      white-space: pre-wrap;
-    }
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+                opacity: 0.7;
+            }
+            30% {
+                transform: translateY(-10px);
+                opacity: 1;
+            }
+        }
 
-    .section-title {
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.11em;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
+        .chat-input-area {
+            padding: 20px 30px;
+            background: #16213e;
+            border-top: 1px solid rgba(0, 149, 255, 0.2);
+        }
 
-    .contexts {
-      max-height: 250px;
-      overflow-y: auto;
-      border-radius: 14px;
-      padding: 10px;
-      background: radial-gradient(circle at top left, #020617 0, #020617 42%, #020617 100%);
-      border: 1px solid rgba(31, 41, 55, 0.9);
-      font-size: 13px;
-      color: var(--text-muted);
-    }
+        .input-mode-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            justify-content: center;
+        }
 
-    .context-item {
-      padding: 6px 6px 8px;
-      border-radius: 10px;
-      border: 1px solid transparent;
-      transition: border 0.14s ease, background 0.14s ease, transform 0.1s ease;
-      margin-bottom: 4px;
-    }
+        .mode-btn {
+            padding: 8px 20px;
+            border: 2px solid rgba(0, 149, 255, 0.3);
+            background: rgba(0, 120, 212, 0.1);
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9em;
+            color: #8ab4f8;
+            backdrop-filter: blur(10px);
+        }
 
-    .context-item:hover {
-      background: rgba(15, 23, 42, 0.95);
-      border-color: rgba(55, 65, 81, 0.95);
-      transform: translateY(-1px);
-    }
+        .mode-btn.active {
+            background: linear-gradient(135deg, #0078d4 0%, #005a9e 100%);
+            color: white;
+            border-color: #0078d4;
+            box-shadow: 0 4px 15px rgba(0, 120, 212, 0.3);
+        }
 
-    .context-index {
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.12em;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
+        .input-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            justify-content: center;
+        }
 
-    .context-text {
-      font-size: 13px;
-      color: #d1d5db;
-      white-space: pre-wrap;
-    }
+        .text-input-group {
+            flex: 1;
+            display: none;
+        }
 
-    .pill-small {
-      font-size: 11px;
-      padding: 3px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(55, 65, 81, 0.9);
-      color: var(--text-muted);
-    }
+        .text-input-group.active {
+            display: flex;
+            gap: 12px;
+        }
 
-    .pill-small.greenish {
-      border-color: rgba(34, 197, 94, 0.6);
-      background: rgba(22, 101, 52, 0.14);
-      color: #bbf7d0;
-    }
+        .voice-input-group {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+        }
 
-    .pill-small.warn {
-      border-color: rgba(248, 113, 113, 0.7);
-      background: rgba(127, 29, 29, 0.25);
-      color: #fecaca;
-    }
+        .voice-input-group.active {
+            display: flex;
+        }
 
-    .stack {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
+        #messageInput {
+            flex: 1;
+            padding: 12px 18px;
+            border: 2px solid rgba(0, 149, 255, 0.3);
+            border-radius: 25px;
+            font-size: 1em;
+            resize: none;
+            font-family: inherit;
+            max-height: 120px;
+            transition: all 0.3s;
+            background: #0f1419;
+            color: white;
+        }
 
-    .audio-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 6px;
-    }
+        #messageInput::placeholder {
+            color: #6e7681;
+        }
 
-    audio {
-      width: 100%;
-      height: 32px;
-    }
+        #messageInput:focus {
+            outline: none;
+            border-color: #0078d4;
+            box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1);
+            background: #1a1a2e;
+        }
 
-    .error-text {
-      font-size: 12px;
-      color: #fecaca;
-    }
+        .send-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #0078d4 0%, #005a9e 100%);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            flex-shrink: 0;
+            box-shadow: 0 4px 15px rgba(0, 120, 212, 0.3);
+        }
 
-    .loader {
-      width: 13px;
-      height: 13px;
-      border-radius: 999px;
-      border: 2px solid rgba(15, 23, 42, 0.8);
-      border-top-color: rgba(34, 197, 94, 0.9);
-      animation: spin 0.7s linear infinite;
-    }
+        .send-btn:hover:not(:disabled) {
+            transform: scale(1.1);
+            box-shadow: 0 6px 25px rgba(0, 120, 212, 0.5);
+        }
 
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-  </style>
+        .send-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .send-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
+        .voice-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
+        }
+
+        .record-btn-large {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #1a73e8 0%, #0d47a1 100%);
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+            box-shadow: 0 8px 30px rgba(26, 115, 232, 0.4);
+            position: relative;
+        }
+
+        .record-btn-large:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 10px 40px rgba(26, 115, 232, 0.6);
+        }
+
+        .record-btn-large.recording {
+            background: linear-gradient(135deg, #ea4335 0%, #c5221f 100%);
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 10px 40px rgba(234, 67, 53, 0.6);
+        }
+
+        .record-btn-large.recording::before {
+            content: '';
+            position: absolute;
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            border: 3px solid rgba(234, 67, 53, 0.5);
+            animation: ripple 1.5s infinite;
+        }
+
+        @keyframes ripple {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.3);
+                opacity: 0;
+            }
+        }
+
+        .record-btn-large svg {
+            width: 48px;
+            height: 48px;
+            fill: white;
+            z-index: 1;
+        }
+
+        .voice-status {
+            text-align: center;
+            color: #8ab4f8;
+            font-size: 1.1em;
+            min-height: 30px;
+            font-weight: 500;
+        }
+
+        .voice-status.recording {
+            color: #ea4335;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .voice-visualizer {
+            display: none;
+            align-items: center;
+            gap: 4px;
+            height: 60px;
+        }
+
+        .voice-visualizer.active {
+            display: flex;
+        }
+
+        .voice-bar {
+            width: 4px;
+            background: linear-gradient(to top, #0078d4, #1a73e8);
+            border-radius: 2px;
+            animation: wave 1s ease-in-out infinite;
+            box-shadow: 0 0 10px rgba(0, 120, 212, 0.5);
+        }
+
+        .voice-bar:nth-child(1) { animation-delay: 0s; }
+        .voice-bar:nth-child(2) { animation-delay: 0.1s; }
+        .voice-bar:nth-child(3) { animation-delay: 0.2s; }
+        .voice-bar:nth-child(4) { animation-delay: 0.3s; }
+        .voice-bar:nth-child(5) { animation-delay: 0.4s; }
+        .voice-bar:nth-child(6) { animation-delay: 0.3s; }
+        .voice-bar:nth-child(7) { animation-delay: 0.2s; }
+        .voice-bar:nth-child(8) { animation-delay: 0.1s; }
+        .voice-bar:nth-child(9) { animation-delay: 0s; }
+
+        @keyframes wave {
+            0%, 100% { height: 10px; }
+            50% { height: 50px; }
+        }
+
+        .welcome-message {
+            text-align: center;
+            padding: 50px 20px;
+            color: #6e7681;
+        }
+
+        .welcome-message h2 {
+            font-size: 2em;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, #0078d4 0%, #1a73e8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+
+        .welcome-message p {
+            font-size: 1em;
+            line-height: 1.8;
+            color: #8ab4f8;
+        }
+
+        .welcome-logo {
+            font-size: 4em;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 0 20px rgba(0, 120, 212, 0.5));
+        }
+
+        .error-message {
+            background: rgba(234, 67, 53, 0.15);
+            color: #f28b82;
+            padding: 12px 18px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            display: none;
+            font-size: 0.9em;
+            border: 1px solid rgba(234, 67, 53, 0.3);
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .chat-container {
+                height: 100vh;
+                border-radius: 0;
+            }
+
+            .message-content {
+                max-width: 85%;
+            }
+
+            .chat-header h1 {
+                font-size: 1.2em;
+            }
+
+            .record-btn-large {
+                width: 100px;
+                height: 100px;
+            }
+
+            .record-btn-large svg {
+                width: 40px;
+                height: 40px;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f1419;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #0078d4;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #005a9e;
+        }
+    </style>
 </head>
-
 <body>
-  <div class="app-wrapper">
-    <header class="app-header">
-      <div class="title-block">
-        <h1>
-          <span>Türkçe Voice QA Agent</span>
-          <span class="title-pill">FastAPI · Azure · RAG</span>
-        </h1>
-        <p class="subtitle">
-          Türkçe haber transcript’lerinden oluşturulmuş knowledge base üzerinde
-          <strong>Text + Voice</strong> soru-cevap.
-        </p>
-        <div class="badge-row">
-          <span class="badge">ASR · Whisper (Azure OpenAI)</span>
-          <span class="badge">RAG · FAISS Vector DB</span>
-          <span class="badge">LLM · Azure OpenAI Chat</span>
-          <span class="badge">TTS · Azure Speech (tr-TR)</span>
-        </div>
-      </div>
-      <div>
-        <div class="status-pill">
-          <span class="status-dot"></span>
-          <span>Backend: <code style="font-size: 11px">/text-qa · /voice-qa</code></span>
-        </div>
-      </div>
-    </header>
-
-    <main class="layout">
-      <!-- LEFT: Text QA -->
-      <section class="card">
-        <div class="card-header">
-          <div class="card-title">
-            Metin tabanlı Soru-Cevap
-            <span class="pill-mini">RAG + LLM</span>
-          </div>
-          <span class="pill-small greenish" id="text-status">Hazır</span>
-        </div>
-        <p class="card-desc">
-          Türkçe bir soru yaz. Agent, FAISS vektör veritabanından ilgili transcript
-          parçalarını alıp LLM ile cevap üretecek.
-        </p>
-
-        <textarea
-          id="text-question"
-          placeholder="Örn: Son dönemde ekonomi bültenlerinde hangi konulardan bahsediliyor?"
-        ></textarea>
-
-        <div class="btn-row">
-          <button class="btn-primary" id="btn-text-ask">
-            <span class="loader" id="text-loader" style="display: none"></span>
-            <span id="text-btn-label">Soruyu Gönder</span>
-          </button>
-          <span class="info-text">
-            Top-k: 5 · Sadece knowledge base'ten cevap üretir.
-          </span>
-        </div>
-
-        <div class="answer-block" id="text-answer-block" style="display:none">
-          <div class="answer-label">Model cevabı</div>
-          <div class="answer-text" id="text-answer"></div>
-        </div>
-      </section>
-
-      <!-- RIGHT: Voice QA + Context panel -->
-      <section class="stack">
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">
-              Sesli Soru-Cevap
-              <span class="pill-mini">ASR · RAG · TTS</span>
+    <div class="chat-container">
+        <div class="chat-header">
+            <div class="chat-header-avatar">☁️</div>
+            <div class="chat-header-info">
+                <h1>Azure Türkçe Asistan</h1>
+                <p>
+                    Yapay Zeka Destekli
+                    <span class="azure-badge">AZURE AI</span>
+                </p>
             </div>
-            <span class="pill-small" id="voice-status">Beklemede</span>
-          </div>
-          <p class="card-desc">
-            Mikrofonla Türkçe bir soru sor. ASR → RAG → LLM → TTS pipeline’ı çalışsın;
-            hem transcript’i hem cevabı hem de sesli yanıtı göreceksin.
-          </p>
-
-          <div class="btn-row">
-            <button class="btn-secondary" id="btn-record">
-              <span class="dot"></span>
-              <span id="record-label">Kaydı Başlat</span>
-            </button>
-            <span class="info-text">
-              Tarayıcı mikrofon erişimine izin vermen gerekiyor.
-            </span>
-          </div>
-
-          <div style="margin-top: 8px;">
-            <span class="info-text" id="voice-info"></span>
-            <p class="error-text" id="voice-error" style="display:none;"></p>
-          </div>
-
-          <div class="answer-block" id="voice-result" style="display:none;">
-            <div class="section-title">ASR Transcript</div>
-            <div class="answer-text" id="voice-transcript"></div>
-
-            <div class="section-title" style="margin-top:10px;">Model Cevabı</div>
-            <div class="answer-text" id="voice-answer"></div>
-
-            <div class="section-title" style="margin-top:10px;">Sesli Yanıt</div>
-            <div class="audio-row">
-              <audio id="voice-audio" controls></audio>
-            </div>
-          </div>
+            <button class="api-config-toggle" onclick="toggleApiConfig()">⚙️ Ayarlar</button>
         </div>
 
-        <!-- Contexts panel: son text-qa çağrısının contextleri -->
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">
-              Retrieval Bağlamı
-              <span class="pill-mini">FAISS · docs.pkl</span>
-            </div>
-            <span class="pill-small" id="ctx-status">Henüz sorgu yok</span>
-          </div>
-          <p class="card-desc">
-            Metin sorularında kullanılan en alakalı transcript parçaları.
-          </p>
-
-          <div class="contexts" id="contexts"></div>
+        <div class="api-config" id="apiConfig">
+            <label>API Base URL:</label>
+            <input type="text" id="apiUrl" value="http://localhost:8000" placeholder="http://localhost:8000">
         </div>
-      </section>
-    </main>
-  </div>
 
-  <script>
-    const API_BASE = ""; // Aynı origin'de çalışıyorsa boş bırak
+        <div class="chat-messages" id="chatMessages">
+            <div class="welcome-message">
+                <div class="welcome-logo">☁️</div>
+                <h2>Azure Türkçe Asistan</h2>
+                <p>Merhaba! Ben Microsoft Azure teknolojisiyle güçlendirilmiş<br>
+                Türkçe konuşan yapay zeka asistanınızım.<br><br>
+                Metin veya sesli olarak soru sorabilirsiniz.</p>
+            </div>
+        </div>
 
-    const textQuestionEl = document.getElementById("text-question");
-    const textBtn = document.getElementById("btn-text-ask");
-    const textBtnLabel = document.getElementById("text-btn-label");
-    const textLoader = document.getElementById("text-loader");
-    const textAnswerBlock = document.getElementById("text-answer-block");
-    const textAnswerEl = document.getElementById("text-answer");
-    const textStatus = document.getElementById("text-status");
+        <div class="chat-input-area">
+            <div class="error-message" id="errorMessage"></div>
+            
+            <div class="input-mode-toggle">
+                <button class="mode-btn active" onclick="switchInputMode('text')">📝 Metin</button>
+                <button class="mode-btn" onclick="switchInputMode('voice')">🎤 Sesli</button>
+            </div>
 
-    const contextsEl = document.getElementById("contexts");
-    const ctxStatusEl = document.getElementById("ctx-status");
+            <div class="input-wrapper">
+                <div class="text-input-group active" id="textInputGroup">
+                    <textarea id="messageInput" placeholder="Bir şey sorun..." rows="1"></textarea>
+                    <button class="send-btn" onclick="sendTextMessage()" id="sendBtn">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                        </svg>
+                    </button>
+                </div>
 
-    const recordBtn = document.getElementById("btn-record");
-    const recordLabel = document.getElementById("record-label");
-    const voiceStatus = document.getElementById("voice-status");
-    const voiceInfo = document.getElementById("voice-info");
-    const voiceError = document.getElementById("voice-error");
-    const voiceResult = document.getElementById("voice-result");
-    const voiceTranscriptEl = document.getElementById("voice-transcript");
-    const voiceAnswerEl = document.getElementById("voice-answer");
-    const voiceAudioEl = document.getElementById("voice-audio");
+                <div class="voice-input-group" id="voiceInputGroup">
+                    <div class="voice-center">
+                        <button class="record-btn-large" id="recordBtnLarge" onclick="toggleRealTimeRecording()">
+                            <svg viewBox="0 0 24 24">
+                                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                            </svg>
+                        </button>
+                        
+                        <div class="voice-visualizer" id="voiceVisualizer">
+                            <div class="voice-bar"></div>
+                            <div class="voice-bar"></div>
+                            <div class="voice-bar"></div>
+                            <div class="voice-bar"></div>
+                            <div class="voice-bar"></div>
+                            <div class="voice-bar"></div>
+                            <div class="voice-bar"></div>
+                            <div class="voice-bar"></div>
+                            <div class="voice-bar"></div>
+                        </div>
+                        
+                        <div class="voice-status" id="voiceStatus">Konuşmak için butona basın</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    let mediaRecorder = null;
-    let audioChunks = [];
-    let isRecording = false;
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+        let currentInputMode = 'text';
 
-    // ---------- TEXT QA -----------
+        function toggleApiConfig() {
+            document.getElementById('apiConfig').classList.toggle('show');
+        }
 
-    async function handleTextQA() {
-      const question = textQuestionEl.value.trim();
-      if (!question) {
-        textStatus.textContent = "Soru boş";
-        textStatus.classList.add("warn");
-        setTimeout(() => {
-          textStatus.textContent = "Hazır";
-          textStatus.classList.remove("warn");
-        }, 1600);
-        return;
-      }
+        function getApiUrl() {
+            return document.getElementById('apiUrl').value.trim() || 'http://localhost:8000';
+        }
 
-      textBtn.disabled = true;
-      textLoader.style.display = "inline-block";
-      textBtnLabel.textContent = "Yanıt üretiliyor...";
-      textStatus.textContent = "Sorgulanıyor...";
-      textStatus.classList.add("greenish");
-      textAnswerBlock.style.display = "none";
-      ctxStatusEl.textContent = "Retrieval çalışıyor...";
-      contextsEl.innerHTML = "";
+        function switchInputMode(mode) {
+            currentInputMode = mode;
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
 
-      try {
-        const res = await fetch(`${API_BASE}/text-qa`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question }),
+            document.getElementById('textInputGroup').classList.remove('active');
+            document.getElementById('voiceInputGroup').classList.remove('active');
+
+            if (mode === 'text') {
+                document.getElementById('textInputGroup').classList.add('active');
+            } else {
+                document.getElementById('voiceInputGroup').classList.add('active');
+            }
+        }
+
+        function addMessage(type, content, audioBase64 = null, contexts = null) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const welcome = messagesDiv.querySelector('.welcome-message');
+            if (welcome) welcome.remove();
+
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = type === 'user' ? '👤' : '☁️';
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.textContent = content;
+
+            if (audioBase64) {
+                const audioDiv = document.createElement('div');
+                audioDiv.className = 'message-audio';
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                const audioBlob = base64ToBlob(audioBase64, 'audio/wav');
+                audio.src = URL.createObjectURL(audioBlob);
+                audioDiv.appendChild(audio);
+                contentDiv.appendChild(audioDiv);
+            }
+
+            if (contexts && contexts.length > 0) {
+                const contextsDiv = document.createElement('div');
+                contextsDiv.className = 'message-contexts';
+                
+                const title = document.createElement('div');
+                title.className = 'message-contexts-title';
+                title.textContent = '📚 Kaynak Bağlamlar:';
+                contextsDiv.appendChild(title);
+
+                contexts.forEach((ctx, idx) => {
+                    const ctxItem = document.createElement('div');
+                    ctxItem.className = 'context-item';
+                    ctxItem.textContent = `${idx + 1}. ${ctx}`;
+                    contextsDiv.appendChild(ctxItem);
+                });
+
+                contentDiv.appendChild(contextsDiv);
+            }
+
+            messageDiv.appendChild(avatar);
+            messageDiv.appendChild(contentDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function showTypingIndicator() {
+            const messagesDiv = document.getElementById('chatMessages');
+            const typing = document.createElement('div');
+            typing.id = 'typingIndicator';
+            typing.className = 'message assistant';
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'message-avatar';
+            avatar.textContent = '☁️';
+            
+            const indicator = document.createElement('div');
+            indicator.className = 'typing-indicator show';
+            indicator.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+            
+            typing.appendChild(avatar);
+            typing.appendChild(indicator);
+            messagesDiv.appendChild(typing);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function hideTypingIndicator() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) indicator.remove();
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('show');
+            setTimeout(() => errorDiv.classList.remove('show'), 5000);
+        }
+
+        async function sendTextMessage() {
+            const input = document.getElementById('messageInput');
+            const question = input.value.trim();
+            
+            if (!question) {
+                showError('Lütfen bir soru yazın.');
+                return;
+            }
+
+            addMessage('user', question);
+            input.value = '';
+            input.style.height = 'auto';
+            
+            showTypingIndicator();
+
+            try {
+                const response = await fetch(`${getApiUrl()}/text-qa`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ question: question, top_k: 5 })
+                });
+
+                if (!response.ok) throw new Error(`API hatası: ${response.status}`);
+
+                const data = await response.json();
+                hideTypingIndicator();
+                addMessage('assistant', data.answer, null, data.contexts);
+            } catch (error) {
+                hideTypingIndicator();
+                showError(`Hata: ${error.message}`);
+            }
+        }
+
+        async function toggleRealTimeRecording() {
+            const btn = document.getElementById('recordBtnLarge');
+            const status = document.getElementById('voiceStatus');
+            const visualizer = document.getElementById('voiceVisualizer');
+            
+            if (isRecording) {
+                // Kaydı durdur
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                    isRecording = false;
+                    btn.classList.remove('recording');
+                    status.classList.remove('recording');
+                    status.textContent = 'İşleniyor...';
+                    visualizer.classList.remove('active');
+                }
+            } else {
+                // Kaydı başlat
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                        stream.getTracks().forEach(track => track.stop());
+                        
+                        // Ses mesajını gönder
+                        await processVoiceMessage(audioBlob);
+                        
+                        status.textContent = 'Konuşmak için butona basın';
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    btn.classList.add('recording');
+                    status.classList.add('recording');
+                    status.textContent = '🔴 Dinliyorum... (Bitirmek için tekrar basın)';
+                    visualizer.classList.add('active');
+
+                } catch (error) {
+                    showError(`Mikrofon erişimi hatası: ${error.message}`);
+                    isRecording = false;
+                }
+            }
+        }
+
+        async function processVoiceMessage(audioBlob) {
+            const status = document.getElementById('voiceStatus');
+            
+            addMessage('user', '🎤 Sesli mesaj gönderildi');
+            status.textContent = 'Ses tanınıyor...';
+            
+            showTypingIndicator();
+
+            const formData = new FormData();
+            formData.append('file', audioBlob, 'audio.wav');
+
+            try {
+                const response = await fetch(`${getApiUrl()}/voice-qa`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error(`API hatası: ${response.status}`);
+
+                const data = await response.json();
+                hideTypingIndicator();
+                
+                // İlk mesaj: Anlaşılan metin
+                addMessage('assistant', `🎤 Anladım: "${data.transcript}"`);
+                
+                // İkinci mesaj: Yanıt ve ses
+                setTimeout(() => {
+                    addMessage('assistant', data.answer, data.audio_base64);
+                }, 300);
+
+            } catch (error) {
+                hideTypingIndicator();
+                showError(`Hata: ${error.message}`);
+            }
+        }
+
+        function base64ToBlob(base64, mimeType) {
+            const byteCharacters = atob(base64);
+            const byteArrays = [];
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteArrays.push(byteCharacters.charCodeAt(i));
+            }
+            return new Blob([new Uint8Array(byteArrays)], { type: mimeType });
+        }
+
+        // Enter ile gönder (Shift+Enter ile yeni satır)
+        document.getElementById('messageInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendTextMessage();
+            }
         });
 
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          const msg = err.detail || `Sunucu hatası: ${res.status}`;
-          throw new Error(msg);
-        }
-
-        const data = await res.json();
-        textAnswerEl.textContent = data.answer || "(Boş yanıt)";
-        textAnswerBlock.style.display = "block";
-        textStatus.textContent = "Tamamlandı";
-
-        if (Array.isArray(data.contexts) && data.contexts.length) {
-          ctxStatusEl.textContent = `${data.contexts.length} parça kullanıldı`;
-          contextsEl.innerHTML = "";
-          data.contexts.forEach((ctx, idx) => {
-            const item = document.createElement("div");
-            item.className = "context-item";
-            item.innerHTML = `
-              <div class="context-index">Parça ${idx + 1}</div>
-              <div class="context-text">${ctx}</div>
-            `;
-            contextsEl.appendChild(item);
-          });
-        } else {
-          ctxStatusEl.textContent = "Bağlam bulunamadı";
-          contextsEl.innerHTML = "<span class='info-text'>Herhangi bir parça döndürülmedi.</span>";
-        }
-      } catch (err) {
-        console.error(err);
-        textStatus.textContent = "Hata oluştu";
-        ctxStatusEl.textContent = "Retrieval hatası";
-        contextsEl.innerHTML = `<span class="error-text">${err.message}</span>`;
-      } finally {
-        textBtn.disabled = false;
-        textLoader.style.display = "none";
-        textBtnLabel.textContent = "Soruyu Gönder";
-      }
-    }
-
-    textBtn.addEventListener("click", handleTextQA);
-    textQuestionEl.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        handleTextQA();
-      }
-    });
-
-    // ---------- VOICE QA -----------
-
-    async function toggleRecording() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        voiceError.style.display = "block";
-        voiceError.textContent = "Tarayıcınız mikrofon kaydını desteklemiyor.";
-        return;
-      }
-
-      if (!isRecording) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          audioChunks = [];
-          mediaRecorder = new MediaRecorder(stream);
-          mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) audioChunks.push(event.data);
-          };
-          mediaRecorder.onstop = () => {
-            stream.getTracks().forEach((t) => t.stop());
-            sendAudioToBackend();
-          };
-          mediaRecorder.start();
-          isRecording = true;
-          recordBtn.classList.add("recording");
-          recordLabel.textContent = "Kaydı Durdur";
-          voiceStatus.textContent = "Kayıt alınıyor...";
-          voiceInfo.textContent = "Sorunu söyle, bitince 'Kaydı Durdur' tuşuna bas.";
-          voiceError.style.display = "none";
-        } catch (err) {
-          console.error(err);
-          voiceError.style.display = "block";
-          voiceError.textContent = "Mikrofona erişilemedi. İzin verdiğinden emin ol.";
-        }
-      } else {
-        isRecording = false;
-        recordBtn.classList.remove("recording");
-        recordLabel.textContent = "Kaydı Başlat";
-        voiceStatus.textContent = "Ses işleniyor...";
-        voiceInfo.textContent = "Kaydın backend'e gönderiliyor, lütfen bekle.";
-        if (mediaRecorder && mediaRecorder.state !== "inactive") {
-          mediaRecorder.stop();
-        }
-      }
-    }
-
-    async function sendAudioToBackend() {
-      try {
-        const blob = new Blob(audioChunks, { type: "audio/webm" });
-        const formData = new FormData();
-        formData.append("file", blob, "question.webm");
-
-        const res = await fetch(`${API_BASE}/voice-qa`, {
-          method: "POST",
-          body: formData,
+        // Textarea otomatik yükseklik
+        document.getElementById('messageInput').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
         });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          const msg = err.detail || `Sunucu hatası: ${res.status}`;
-          throw new Error(msg);
-        }
-
-        const data = await res.json();
-        voiceResult.style.display = "block";
-        voiceTranscriptEl.textContent = data.transcript || "(Transcript yok)";
-        voiceAnswerEl.textContent = data.answer || "(Yanıt yok)";
-
-        if (data.audio_base64) {
-          const src = `data:audio/wav;base64,${data.audio_base64}`;
-          voiceAudioEl.src = src;
-          voiceAudioEl.load();
-        }
-
-        voiceStatus.textContent = "Tamamlandı";
-        voiceInfo.textContent = "Yeni bir soru sormak için tekrar kayıt başlatabilirsin.";
-      } catch (err) {
-        console.error(err);
-        voiceError.style.display = "block";
-        voiceError.textContent = err.message;
-        voiceStatus.textContent = "Hata oluştu";
-        voiceInfo.textContent = "";
-      }
-    }
-
-    recordBtn.addEventListener("click", toggleRecording);
-  </script>
+    </script>
 </body>
 </html>
