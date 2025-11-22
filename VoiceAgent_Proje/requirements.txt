@@ -1,0 +1,9 @@
+# requirements.txt - projenin ihtiyaç duyduğu Python paketleri
+flask
+numpy
+pandas
+faiss-cpu
+sentence-transformers
+python-dotenv
+requests
+# ek paketler: openai, tts kütüphaneleri vs. ihtiyaca göre ekleyin
