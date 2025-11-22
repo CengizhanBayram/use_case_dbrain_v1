@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Türkçe Voice QA Agent</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <style>
+    :root {
+      --bg: #050816;
+      --bg-card: #0f172a;
+      --bg-card-alt: #020617;
+      --accent: #22c55e;
+      --accent-soft: rgba(34, 197, 94, 0.12);
+      --accent-dark: #16a34a;
+      --text: #e5e7eb;
+      --text-muted: #9ca3af;
+      --border: #1f2937;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+        "Segoe UI", sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #1d283a 0, #020617 40%, #000 100%);
+      color: var(--text);
+      display: flex;
+      justify-content: center;   /* Sadece yatayda ortala, dikeyde değil */
+    }
+
+    /* İçerik yukarıya yakın, biraz daha geniş */
+    .app-wrapper {
+      width: 100%;
+      max-width: 1200px;
+      padding: 32px 32px 40px;
+      margin: 32px auto 0;
+    }
+
+    @media (max-width: 960px) {
+      .app-wrapper {
+        padding: 24px 16px 32px;
+        margin-top: 16px;
+      }
+    }
+
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 24px;
+    }
+
+    .title-block h1 {
+      font-size: 28px;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .title-pill {
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(55, 65, 81, 0.8);
+      color: var(--text-muted);
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .badge-row {
+      margin-top: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .badge {
+      font-size: 11px;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(31, 41, 55, 0.7);
+      border: 1px solid rgba(55, 65, 81, 0.9);
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 12px rgba(34, 197, 94, 0.85);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(22, 101, 52, 0.18);
+      border: 1px solid rgba(34, 197, 94, 0.4);
+      color: #bbf7d0;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 3fr 2fr;
+      gap: 18px;
+      margin-top: 8px; /* header ile içerik arasını biraz sıklaştır */
+    }
+
+    @media (max-width: 960px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+      .app-header {
+        flex-direction: column;
+      }
+    }
+
+    .card {
+      border-radius: 18px;
+      border: 1px solid rgba(31, 41, 55, 0.9);
+      background: linear-gradient(
+        145deg,
+        rgba(15, 23, 42, 0.98),
+        rgba(15, 23, 42, 0.92)
+      );
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.85);
+      padding: 18px 18px 16px;
+      backdrop-filter: blur(18px);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pill-mini {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(55, 65, 81, 0.8);
+      color: var(--text-muted);
+    }
+
+    .card-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+    }
+
+    textarea {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: radial-gradient(circle at top left, #020617 0, #020617 45%, #030712 100%);
+      color: var(--text);
+      font-size: 14px;
+      padding: 10px 12px;
+      resize: vertical;
+      min-height: 90px;
+      outline: none;
+      transition: border 0.16s ease, box-shadow 0.16s ease, background 0.18s ease;
+    }
+
+    textarea:focus {
+      border-color: rgba(34, 197, 94, 0.8);
+      box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.6);
+      background: radial-gradient(circle at top left, #020617 0, #020617 40%, #020617 100%);
+    }
+
+    .btn-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      gap: 10px;
+    }
+
+    .btn-primary {
+      border: none;
+      border-radius: 999px;
+      padding: 9px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+      color: #021110;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow:
+        0 0 12px rgba(34, 197, 94, 0.4),
+        0 16px 36px rgba(22, 163, 74, 0.50);
+      transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+      box-shadow:
+        0 3px 16px rgba(34, 197, 94, 0.6),
+        0 20px 40px rgba(22, 163, 74, 0.55);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0px) scale(0.99);
+      box-shadow: 0 6px 16px rgba(22, 163, 74, 0.5);
+    }
+
+    .btn-secondary {
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 13px;
+      border: 1px solid rgba(55, 65, 81, 0.9);
+      background: rgba(15, 23, 42, 0.8);
+      color: var(--text-muted);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.16s ease, border 0.16s ease, transform 0.12s ease;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(30, 64, 175, 0.24);
+      border-color: rgba(59, 130, 246, 0.8);
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary.recording {
+      color: #fecaca;
+      border-color: rgba(248, 113, 113, 0.9);
+      background: radial-gradient(circle at top left, #450a0a 0, #111827 60%);
+      box-shadow: 0 0 18px rgba(239, 68, 68, 0.8);
+      animation: pulse 1.3s infinite;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+      70% { box-shadow: 0 0 0 12px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    .btn-secondary .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: #f87171;
+    }
+
+    .btn-secondary.recording .dot {
+      background: #fee2e2;
+    }
+
+    .info-text {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .answer-block {
+      margin-top: 14px;
+      padding-top: 10px;
+      border-top: 1px dashed rgba(55, 65, 81, 0.75);
+    }
+
+    .answer-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .answer-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text);
+      white-space: pre-wrap;
+    }
+
+    .section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.11em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .contexts {
+      max-height: 250px;
+      overflow-y: auto;
+      border-radius: 14px;
+      padding: 10px;
+      background: radial-gradient(circle at top left, #020617 0, #020617 42%, #020617 100%);
+      border: 1px solid rgba(31, 41, 55, 0.9);
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .context-item {
+      padding: 6px 6px 8px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      transition: border 0.14s ease, background 0.14s ease, transform 0.1s ease;
+      margin-bottom: 4px;
+    }
+
+    .context-item:hover {
+      background: rgba(15, 23, 42, 0.95);
+      border-color: rgba(55, 65, 81, 0.95);
+      transform: translateY(-1px);
+    }
+
+    .context-index {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .context-text {
+      font-size: 13px;
+      color: #d1d5db;
+      white-space: pre-wrap;
+    }
+
+    .pill-small {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(55, 65, 81, 0.9);
+      color: var(--text-muted);
+    }
+
+    .pill-small.greenish {
+      border-color: rgba(34, 197, 94, 0.6);
+      background: rgba(22, 101, 52, 0.14);
+      color: #bbf7d0;
+    }
+
+    .pill-small.warn {
+      border-color: rgba(248, 113, 113, 0.7);
+      background: rgba(127, 29, 29, 0.25);
+      color: #fecaca;
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .audio-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    audio {
+      width: 100%;
+      height: 32px;
+    }
+
+    .error-text {
+      font-size: 12px;
+      color: #fecaca;
+    }
+
+    .loader {
+      width: 13px;
+      height: 13px;
+      border-radius: 999px;
+      border: 2px solid rgba(15, 23, 42, 0.8);
+      border-top-color: rgba(34, 197, 94, 0.9);
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-wrapper">
+    <header class="app-header">
+      <div class="title-block">
+        <h1>
+          <span>Türkçe Voice QA Agent</span>
+          <span class="title-pill">FastAPI · Azure · RAG</span>
+        </h1>
+        <p class="subtitle">
+          Türkçe haber transcript’lerinden oluşturulmuş knowledge base üzerinde
+          <strong>Text + Voice</strong> soru-cevap.
+        </p>
+        <div class="badge-row">
+          <span class="badge">ASR · Whisper (Azure OpenAI)</span>
+          <span class="badge">RAG · FAISS Vector DB</span>
+          <span class="badge">LLM · Azure OpenAI Chat</span>
+          <span class="badge">TTS · Azure Speech (tr-TR)</span>
+        </div>
+      </div>
+      <div>
+        <div class="status-pill">
+          <span class="status-dot"></span>
+          <span>Backend: <code style="font-size: 11px">/text-qa · /voice-qa</code></span>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <!-- LEFT: Text QA -->
+      <section class="card">
+        <div class="card-header">
+          <div class="card-title">
+            Metin tabanlı Soru-Cevap
+            <span class="pill-mini">RAG + LLM</span>
+          </div>
+          <span class="pill-small greenish" id="text-status">Hazır</span>
+        </div>
+        <p class="card-desc">
+          Türkçe bir soru yaz. Agent, FAISS vektör veritabanından ilgili transcript
+          parçalarını alıp LLM ile cevap üretecek.
+        </p>
+
+        <textarea
+          id="text-question"
+          placeholder="Örn: Son dönemde ekonomi bültenlerinde hangi konulardan bahsediliyor?"
+        ></textarea>
+
+        <div class="btn-row">
+          <button class="btn-primary" id="btn-text-ask">
+            <span class="loader" id="text-loader" style="display: none"></span>
+            <span id="text-btn-label">Soruyu Gönder</span>
+          </button>
+          <span class="info-text">
+            Top-k: 5 · Sadece knowledge base'ten cevap üretir.
+          </span>
+        </div>
+
+        <div class="answer-block" id="text-answer-block" style="display:none">
+          <div class="answer-label">Model cevabı</div>
+          <div class="answer-text" id="text-answer"></div>
+        </div>
+      </section>
+
+      <!-- RIGHT: Voice QA + Context panel -->
+      <section class="stack">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              Sesli Soru-Cevap
+              <span class="pill-mini">ASR · RAG · TTS</span>
+            </div>
+            <span class="pill-small" id="voice-status">Beklemede</span>
+          </div>
+          <p class="card-desc">
+            Mikrofonla Türkçe bir soru sor. ASR → RAG → LLM → TTS pipeline’ı çalışsın;
+            hem transcript’i hem cevabı hem de sesli yanıtı göreceksin.
+          </p>
+
+          <div class="btn-row">
+            <button class="btn-secondary" id="btn-record">
+              <span class="dot"></span>
+              <span id="record-label">Kaydı Başlat</span>
+            </button>
+            <span class="info-text">
+              Tarayıcı mikrofon erişimine izin vermen gerekiyor.
+            </span>
+          </div>
+
+          <div style="margin-top: 8px;">
+            <span class="info-text" id="voice-info"></span>
+            <p class="error-text" id="voice-error" style="display:none;"></p>
+          </div>
+
+          <div class="answer-block" id="voice-result" style="display:none;">
+            <div class="section-title">ASR Transcript</div>
+            <div class="answer-text" id="voice-transcript"></div>
+
+            <div class="section-title" style="margin-top:10px;">Model Cevabı</div>
+            <div class="answer-text" id="voice-answer"></div>
+
+            <div class="section-title" style="margin-top:10px;">Sesli Yanıt</div>
+            <div class="audio-row">
+              <audio id="voice-audio" controls></audio>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contexts panel: son text-qa çağrısının contextleri -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">
+              Retrieval Bağlamı
+              <span class="pill-mini">FAISS · docs.pkl</span>
+            </div>
+            <span class="pill-small" id="ctx-status">Henüz sorgu yok</span>
+          </div>
+          <p class="card-desc">
+            Metin sorularında kullanılan en alakalı transcript parçaları.
+          </p>
+
+          <div class="contexts" id="contexts"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const API_BASE = ""; // Aynı origin'de çalışıyorsa boş bırak
+
+    const textQuestionEl = document.getElementById("text-question");
+    const textBtn = document.getElementById("btn-text-ask");
+    const textBtnLabel = document.getElementById("text-btn-label");
+    const textLoader = document.getElementById("text-loader");
+    const textAnswerBlock = document.getElementById("text-answer-block");
+    const textAnswerEl = document.getElementById("text-answer");
+    const textStatus = document.getElementById("text-status");
+
+    const contextsEl = document.getElementById("contexts");
+    const ctxStatusEl = document.getElementById("ctx-status");
+
+    const recordBtn = document.getElementById("btn-record");
+    const recordLabel = document.getElementById("record-label");
+    const voiceStatus = document.getElementById("voice-status");
+    const voiceInfo = document.getElementById("voice-info");
+    const voiceError = document.getElementById("voice-error");
+    const voiceResult = document.getElementById("voice-result");
+    const voiceTranscriptEl = document.getElementById("voice-transcript");
+    const voiceAnswerEl = document.getElementById("voice-answer");
+    const voiceAudioEl = document.getElementById("voice-audio");
+
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecording = false;
+
+    // ---------- TEXT QA -----------
+
+    async function handleTextQA() {
+      const question = textQuestionEl.value.trim();
+      if (!question) {
+        textStatus.textContent = "Soru boş";
+        textStatus.classList.add("warn");
+        setTimeout(() => {
+          textStatus.textContent = "Hazır";
+          textStatus.classList.remove("warn");
+        }, 1600);
+        return;
+      }
+
+      textBtn.disabled = true;
+      textLoader.style.display = "inline-block";
+      textBtnLabel.textContent = "Yanıt üretiliyor...";
+      textStatus.textContent = "Sorgulanıyor...";
+      textStatus.classList.add("greenish");
+      textAnswerBlock.style.display = "none";
+      ctxStatusEl.textContent = "Retrieval çalışıyor...";
+      contextsEl.innerHTML = "";
+
+      try {
+        const res = await fetch(`${API_BASE}/text-qa`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const msg = err.detail || `Sunucu hatası: ${res.status}`;
+          throw new Error(msg);
+        }
+
+        const data = await res.json();
+        textAnswerEl.textContent = data.answer || "(Boş yanıt)";
+        textAnswerBlock.style.display = "block";
+        textStatus.textContent = "Tamamlandı";
+
+        if (Array.isArray(data.contexts) && data.contexts.length) {
+          ctxStatusEl.textContent = `${data.contexts.length} parça kullanıldı`;
+          contextsEl.innerHTML = "";
+          data.contexts.forEach((ctx, idx) => {
+            const item = document.createElement("div");
+            item.className = "context-item";
+            item.innerHTML = `
+              <div class="context-index">Parça ${idx + 1}</div>
+              <div class="context-text">${ctx}</div>
+            `;
+            contextsEl.appendChild(item);
+          });
+        } else {
+          ctxStatusEl.textContent = "Bağlam bulunamadı";
+          contextsEl.innerHTML = "<span class='info-text'>Herhangi bir parça döndürülmedi.</span>";
+        }
+      } catch (err) {
+        console.error(err);
+        textStatus.textContent = "Hata oluştu";
+        ctxStatusEl.textContent = "Retrieval hatası";
+        contextsEl.innerHTML = `<span class="error-text">${err.message}</span>`;
+      } finally {
+        textBtn.disabled = false;
+        textLoader.style.display = "none";
+        textBtnLabel.textContent = "Soruyu Gönder";
+      }
+    }
+
+    textBtn.addEventListener("click", handleTextQA);
+    textQuestionEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        handleTextQA();
+      }
+    });
+
+    // ---------- VOICE QA -----------
+
+    async function toggleRecording() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        voiceError.style.display = "block";
+        voiceError.textContent = "Tarayıcınız mikrofon kaydını desteklemiyor.";
+        return;
+      }
+
+      if (!isRecording) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioChunks = [];
+          mediaRecorder = new MediaRecorder(stream);
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) audioChunks.push(event.data);
+          };
+          mediaRecorder.onstop = () => {
+            stream.getTracks().forEach((t) => t.stop());
+            sendAudioToBackend();
+          };
+          mediaRecorder.start();
+          isRecording = true;
+          recordBtn.classList.add("recording");
+          recordLabel.textContent = "Kaydı Durdur";
+          voiceStatus.textContent = "Kayıt alınıyor...";
+          voiceInfo.textContent = "Sorunu söyle, bitince 'Kaydı Durdur' tuşuna bas.";
+          voiceError.style.display = "none";
+        } catch (err) {
+          console.error(err);
+          voiceError.style.display = "block";
+          voiceError.textContent = "Mikrofona erişilemedi. İzin verdiğinden emin ol.";
+        }
+      } else {
+        isRecording = false;
+        recordBtn.classList.remove("recording");
+        recordLabel.textContent = "Kaydı Başlat";
+        voiceStatus.textContent = "Ses işleniyor...";
+        voiceInfo.textContent = "Kaydın backend'e gönderiliyor, lütfen bekle.";
+        if (mediaRecorder && mediaRecorder.state !== "inactive") {
+          mediaRecorder.stop();
+        }
+      }
+    }
+
+    async function sendAudioToBackend() {
+      try {
+        const blob = new Blob(audioChunks, { type: "audio/webm" });
+        const formData = new FormData();
+        formData.append("file", blob, "question.webm");
+
+        const res = await fetch(`${API_BASE}/voice-qa`, {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          const msg = err.detail || `Sunucu hatası: ${res.status}`;
+          throw new Error(msg);
+        }
+
+        const data = await res.json();
+        voiceResult.style.display = "block";
+        voiceTranscriptEl.textContent = data.transcript || "(Transcript yok)";
+        voiceAnswerEl.textContent = data.answer || "(Yanıt yok)";
+
+        if (data.audio_base64) {
+          const src = `data:audio/wav;base64,${data.audio_base64}`;
+          voiceAudioEl.src = src;
+          voiceAudioEl.load();
+        }
+
+        voiceStatus.textContent = "Tamamlandı";
+        voiceInfo.textContent = "Yeni bir soru sormak için tekrar kayıt başlatabilirsin.";
+      } catch (err) {
+        console.error(err);
+        voiceError.style.display = "block";
+        voiceError.textContent = err.message;
+        voiceStatus.textContent = "Hata oluştu";
+        voiceInfo.textContent = "";
+      }
+    }
+
+    recordBtn.addEventListener("click", toggleRecording);
+  </script>
+</body>
+</html>
