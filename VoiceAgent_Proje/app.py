@@ -1,5 +1,6 @@
 import time
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict
@@ -34,6 +35,8 @@ def log_interaction(
     guardrail_reasons: Dict[str, bool],
     tts_time: Optional[float],
     tts_path: Optional[str],
+    input_audio_path: Optional[str] = None,
+    example_prefix: Optional[str] = None,
 ):
     """Her etkileşimi JSONL formatında log dosyasına ekler."""
     record = {
@@ -47,6 +50,8 @@ def log_interaction(
         "guardrail_reasons": guardrail_reasons,
         "tts_time": tts_time,
         "tts_path": tts_path,
+        "input_audio_path": input_audio_path,
+        "example_prefix": example_prefix,
     }
     try:
         with open(LOG_FILE, "a", encoding="utf-8") as f:
@@ -366,7 +371,7 @@ def run_tts_for_answer(answer: str) -> None:
 
 
 # -------------------------------------------------------------------------
-# SESLİ SORU PIPELINE'I (DOSYA YÜKLEME)
+# SESLİ SORU PIPELINE'I (DOSYA YÜKLEME) + TESLİMAT ÖRNEKLERİ
 # -------------------------------------------------------------------------
 
 def handle_voice_question(audio_file) -> None:
@@ -375,6 +380,7 @@ def handle_voice_question(audio_file) -> None:
     - (a) ASR (Gemini) -> transcript
     - (b) RAG + LLM cevabı
     - (c) TTS ile cevap sesi
+    ve hepsini teslimat_ornekleri/ altına kaydeder.
     """
     if audio_file is None:
         st.warning("Lütfen önce bir ses dosyası yükleyin.")
@@ -382,16 +388,21 @@ def handle_voice_question(audio_file) -> None:
 
     gc: GeminiClient = st.session_state.gemini_client
 
-    # Geçici dosya kaydet
+    # Teslimat klasörü + ortak prefix
+    delivery_dir = Path("teslimat_ornekleri")
+    delivery_dir.mkdir(parents=True, exist_ok=True)
+    example_prefix = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+
+    # 1) Kullanıcı input audiosunu kalıcı kaydet
     suffix = Path(audio_file.name).suffix or ".wav"
-    temp_path = Path("temp_upload_audio" + suffix)
-    with open(temp_path, "wb") as f:
+    input_audio_path = delivery_dir / f"{example_prefix}_input{suffix}"
+    with open(input_audio_path, "wb") as f:
         f.write(audio_file.read())
 
     t0 = time.time()
 
-    # (a) ASR
-    transcript = gc.transcribe_audio(str(temp_path))
+    # (a) ASR: Gemini ile transcript
+    transcript = gc.transcribe_audio(str(input_audio_path))
     t1 = time.time()
     st.write(f"⏱️ ASR süresi (dosya): {t1 - t0:.2f} sn")
 
@@ -418,6 +429,25 @@ def handle_voice_question(audio_file) -> None:
     tts_time = st.session_state.last_tts_time
     audio_path = st.session_state.last_audio_path
 
+    # --- TESLİMAT ÖRNEĞİ DOSYALARINI OLUŞTUR ---
+    # transcript ve answer txt
+    transcript_path = delivery_dir / f"{example_prefix}_transcript.txt"
+    transcript_path.write_text(transcript, encoding="utf-8")
+
+    answer_path = delivery_dir / f"{example_prefix}_answer.txt"
+    answer_path.write_text(answer, encoding="utf-8")
+
+    # TTS output'u da teslimat klasörüne kopyala
+    tts_copy_path = None
+    if audio_path:
+        orig_tts = Path(audio_path)
+        tts_copy_path = delivery_dir / f"{example_prefix}_tts_output{orig_tts.suffix}"
+        try:
+            shutil.copy(orig_tts, tts_copy_path)
+        except Exception as e:
+            print(f"[TTS COPY ERROR] {e}")
+            tts_copy_path = None
+
     # Logla
     log_interaction(
         mode="voice",
@@ -428,12 +458,14 @@ def handle_voice_question(audio_file) -> None:
         retrieved_passages=retrieved_docs,
         guardrail_reasons=reasons,
         tts_time=tts_time,
-        tts_path=audio_path,
+        tts_path=str(tts_copy_path) if tts_copy_path else None,
+        input_audio_path=str(input_audio_path),
+        example_prefix=example_prefix,
     )
 
 
 # -------------------------------------------------------------------------
-# SESLİ SORU PIPELINE'I (MİKROFON)
+# SESLİ SORU PIPELINE'I (MİKROFON) + TESLİMAT ÖRNEKLERİ
 # -------------------------------------------------------------------------
 
 def handle_voice_bytes(audio_bytes: bytes) -> None:
@@ -442,6 +474,7 @@ def handle_voice_bytes(audio_bytes: bytes) -> None:
     - (a) ASR (Gemini) -> transcript
     - (b) RAG + LLM cevabı
     - (c) TTS ile cevap sesi
+    ve hepsini teslimat_ornekleri/ altına kaydeder.
     """
     if not audio_bytes:
         st.warning("Kayıt alınamadı.")
@@ -449,15 +482,20 @@ def handle_voice_bytes(audio_bytes: bytes) -> None:
 
     gc: GeminiClient = st.session_state.gemini_client
 
-    # Geçici dosya kaydet
-    temp_path = Path("temp_mic_audio.wav")
-    with open(temp_path, "wb") as f:
+    # Teslimat klasörü + prefix
+    delivery_dir = Path("teslimat_ornekleri")
+    delivery_dir.mkdir(parents=True, exist_ok=True)
+    example_prefix = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+
+    # 1) Kullanıcı input audio'yu kalıcı kaydet (wav)
+    input_audio_path = delivery_dir / f"{example_prefix}_mic_input.wav"
+    with open(input_audio_path, "wb") as f:
         f.write(audio_bytes)
 
     t0 = time.time()
 
-    # (a) ASR
-    transcript = gc.transcribe_audio(str(temp_path))
+    # (a) ASR: Gemini ile transcript
+    transcript = gc.transcribe_audio(str(input_audio_path))
     t1 = time.time()
     st.write(f"⏱️ ASR süresi (mic): {t1 - t0:.2f} sn")
 
@@ -484,6 +522,23 @@ def handle_voice_bytes(audio_bytes: bytes) -> None:
     tts_time = st.session_state.last_tts_time
     audio_path = st.session_state.last_audio_path
 
+    # --- TESLİMAT ÖRNEĞİ DOSYALARI ---
+    transcript_path = delivery_dir / f"{example_prefix}_transcript.txt"
+    transcript_path.write_text(transcript, encoding="utf-8")
+
+    answer_path = delivery_dir / f"{example_prefix}_answer.txt"
+    answer_path.write_text(answer, encoding="utf-8")
+
+    tts_copy_path = None
+    if audio_path:
+        orig_tts = Path(audio_path)
+        tts_copy_path = delivery_dir / f"{example_prefix}_tts_output{orig_tts.suffix}"
+        try:
+            shutil.copy(orig_tts, tts_copy_path)
+        except Exception as e:
+            print(f"[TTS COPY ERROR] {e}")
+            tts_copy_path = None
+
     # Logla
     log_interaction(
         mode="voice",
@@ -494,7 +549,9 @@ def handle_voice_bytes(audio_bytes: bytes) -> None:
         retrieved_passages=retrieved_docs,
         guardrail_reasons=reasons,
         tts_time=tts_time,
-        tts_path=audio_path,
+        tts_path=str(tts_copy_path) if tts_copy_path else None,
+        input_audio_path=str(input_audio_path),
+        example_prefix=example_prefix,
     )
 
 
@@ -577,7 +634,7 @@ def main():
         st.session_state.enable_rewrite = enable_rewrite
 
     # -------------- ANA GÖVDE --------------
-    # ÖNCE KONTROLLER, SONRA CHAT (önce state güncellensin, sonra chat çizilsin)
+    # Önce kontroller, sonra chat (state önce güncellensin)
     col_controls, col_chat = st.columns([1, 2])
 
     # --- Kontroller (ses + transcript) ---
@@ -695,6 +752,8 @@ def main():
                 guardrail_reasons=reasons,
                 tts_time=tts_time,
                 tts_path=audio_path,
+                input_audio_path=None,
+                example_prefix=None,
             )
 
         # Son cevabın sesi ve TTS süresi (her etkileşimden sonra güncellenir)
