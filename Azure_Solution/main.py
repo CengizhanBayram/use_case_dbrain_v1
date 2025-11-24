@@ -1,4 +1,5 @@
 import os
+import re
 import base64
 import tempfile
 from pathlib import Path
@@ -15,7 +16,6 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from openai import AzureOpenAI
-import azure.cognitiveservices.speech as speechsdk
 from dotenv import load_dotenv
 import google.generativeai as genai
 
@@ -27,25 +27,21 @@ import google.generativeai as genai
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
 
-# Azure OpenAI (LLM + Whisper)
+# Azure OpenAI (LLM + Whisper + TTS)
 AZURE_OPENAI_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
 AZURE_OPENAI_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")  # https://xxx.openai.azure.com/
-AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-01")
+AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
 
 AZURE_OPENAI_CHAT_DEPLOYMENT = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT")          # örn: gpt-4o-mini
-AZURE_OPENAI_WHISPER_DEPLOYMENT = os.getenv("AZURE_OPENAI_WHISPER_DEPLOYMENT")    # whisper deployment adı
-
-# Azure Speech (TTS)
-AZURE_SPEECH_KEY = os.getenv("AZURE_SPEECH_KEY")
-AZURE_SPEECH_REGION = os.getenv("AZURE_SPEECH_REGION")  # örn: westeurope
-AZURE_SPEECH_VOICE = os.getenv("AZURE_SPEECH_VOICE", "tr-TR-AhmetNeural")
+AZURE_OPENAI_WHISPER_DEPLOYMENT = os.getenv("AZURE_OPENAI_WHISPER_DEPLOYMENT")    # örn: whisper
+AZURE_OPENAI_TTS_DEPLOYMENT = os.getenv("AZURE_OPENAI_TTS_DEPLOYMENT")            # örn: tts
+AZURE_OPENAI_TTS_VOICE = os.getenv("AZURE_OPENAI_TTS_VOICE", "alloy")
 
 # Gemini (embedding için)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "models/text-embedding-004")
 
 # Vector DB (FAISS + docs + embeddings)
-# VECTOR_DIR'i .env içinde tam path olarak da verebilirsin.
 VECTOR_DIR = Path(os.getenv("VECTOR_DIR", BASE_DIR / "vector_db"))
 DOCS_PATH = VECTOR_DIR / "docs.pkl"
 EMB_PATH = VECTOR_DIR / "embeddings.npy"
@@ -58,8 +54,7 @@ required_env = {
     "AZURE_OPENAI_ENDPOINT": AZURE_OPENAI_ENDPOINT,
     "AZURE_OPENAI_CHAT_DEPLOYMENT": AZURE_OPENAI_CHAT_DEPLOYMENT,
     "AZURE_OPENAI_WHISPER_DEPLOYMENT": AZURE_OPENAI_WHISPER_DEPLOYMENT,
-    "AZURE_SPEECH_KEY": AZURE_SPEECH_KEY,
-    "AZURE_SPEECH_REGION": AZURE_SPEECH_REGION,
+    "AZURE_OPENAI_TTS_DEPLOYMENT": AZURE_OPENAI_TTS_DEPLOYMENT,
     "GEMINI_API_KEY": GEMINI_API_KEY,
 }
 
@@ -71,23 +66,15 @@ if missing:
 
 
 # ============================================================
-# 2. KLIENTLER: Azure OpenAI, Azure Speech, Gemini
+# 2. KLIENTLER: Azure OpenAI, Gemini
 # ============================================================
 
-# Azure OpenAI client
+# Azure OpenAI client (Chat + Whisper + TTS)
 openai_client = AzureOpenAI(
     api_key=AZURE_OPENAI_API_KEY,
     api_version=AZURE_OPENAI_API_VERSION,
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
 )
-
-# Azure Speech config (TTS)
-speech_config = speechsdk.SpeechConfig(
-    subscription=AZURE_SPEECH_KEY,
-    region=AZURE_SPEECH_REGION,
-)
-speech_config.speech_synthesis_language = "tr-TR"
-speech_config.speech_synthesis_voice_name = AZURE_SPEECH_VOICE
 
 # Gemini config (embedding)
 genai.configure(api_key=GEMINI_API_KEY)
@@ -116,7 +103,7 @@ if faiss_index.ntotal != embeddings.shape[0]:
     )
 
 
-# ======================== EMBEDDING ==========================
+# ========================  EMBEDDING (GEMINI)  ==========================
 
 def embed_query(text: str) -> np.ndarray:
     """
@@ -130,7 +117,6 @@ def embed_query(text: str) -> np.ndarray:
     )
 
     emb = result["embedding"]
-    # library versiyonuna göre embedding dict veya liste olabilir
     if isinstance(emb, dict) and "values" in emb:
         vec = np.array(emb["values"], dtype="float32")[None, :]
     else:
@@ -155,24 +141,47 @@ def retrieve_context(question: str, top_k: int = TOP_K_DEFAULT) -> List[str]:
     return contexts
 
 
+def is_question_covered_by_kb(question: str, contexts: List[str]) -> bool:
+    """
+    Sorudaki anlamlı kelimeler bağlam içinde geçiyor mu diye KABACA kontrol eder.
+    Tam eşleşme beklemiyoruz, sadece 'tamamen alakasız mı?' diye bakıyoruz.
+    """
+    q_tokens = re.findall(r"\w+", question.lower())
+    # çok kısa kelimeleri (ve, ile, bir vs.) at
+    q_tokens = [t for t in q_tokens if len(t) > 3]
+    if not q_tokens:
+        return False
+
+    joined_context = " ".join(contexts).lower()
+    return any(t in joined_context for t in q_tokens)
+
+
 def build_messages(question: str, contexts: List[str]) -> list:
+    """
+    LLM'e sadece haber bağlamını kullanarak cevap üretmesini söyler.
+    'Bu metin haber metinlerinde yok' cümlesi BURADA asla yok.
+    """
     context_str = "\n\n".join(
         f"[Parça {i+1}]\n{c}" for i, c in enumerate(contexts)
     )
     user_content = (
-        "Aşağıdaki soruyu sadece verilen bağlamı kullanarak yanıtla.\n\n"
+        "Aşağıdaki soruyu verdiğim haber metni parçalarını kullanarak yanıtla.\n"
+        "Bağlamı özetleyebilir, mantıksal çıkarımlar yapabilirsin.\n"
+        "Sorunun cevabı bağlamda birebir yazmıyorsa bile, bağlamla ilişkili "
+        "mantıklı ve tutarlı bir cevap üret.\n"
+        "Bağlam yetersiz kalsa bile KESİNLİKLE 'Bu metin haber metinlerinde yok.' "
+        "veya 'Bilmiyorum.' gibi bir cümle kurma; bu cevabı sadece backend döndürecek.\n\n"
         f"Soru: {question}\n\n"
-        f"Bağlam:\n{context_str}\n\n"
-        "Bağlamda yeterli bilgi yoksa 'Bilmiyorum.' de ve uydurma.\n"
+        f"Bağlam:\n{context_str}\n"
     )
 
     return [
         {
             "role": "system",
             "content": (
-                "Sen Türkçe konuşan bir bilgi tabanı asistanısın. "
-                "Yalnızca verilen bağlamı kullanarak cevap ver. "
-                "Yanıtlarını net, kısa ve gerektiğinde maddeler halinde ver."
+                "Sen Türkçe konuşan bir haber bilgi tabanı asistanısın. "
+                "Verilen bağlamı birincil kaynak olarak kullan, "
+                "yanıtlarını net ve mümkünse maddeler halinde ver."
             ),
         },
         {"role": "user", "content": user_content},
@@ -180,7 +189,23 @@ def build_messages(question: str, contexts: List[str]) -> list:
 
 
 def answer_with_rag(question: str, top_k: int = TOP_K_DEFAULT) -> Tuple[str, List[str]]:
+    """
+    Hem text-qa hem voice-qa burayı kullanıyor.
+    Burada:
+      - Önce FAISS'ten bağlam çekiyoruz,
+      - Eğer soru ile bağlam arasında HİÇ anlamlı kelime kesişimi yoksa
+        direkt 'Bu metin haber metinlerinde yok.' diyoruz,
+      - Aksi halde LLM'den normal cevap istiyoruz.
+    Böylece:
+      - Haberlere uyan sorularda hem text hem voice normal cevap üretecek,
+      - Tamamen alakasız sorularda tek tip fallback gelecek.
+    """
     contexts = retrieve_context(question, top_k=top_k)
+
+    if not contexts or not is_question_covered_by_kb(question, contexts):
+        # gerçekten haber KB ile alakası yoksa
+        return "Bu metin haber metinlerinde yok.", contexts
+
     messages = build_messages(question, contexts)
 
     completion = openai_client.chat.completions.create(
@@ -228,34 +253,26 @@ def transcribe_audio_with_whisper(audio_bytes: bytes) -> str:
 
 
 # ============================================================
-# 5. TTS (Azure Speech)
+# 5. TTS (Azure OpenAI TTS deployment: tts)
 # ============================================================
 
 def synthesize_speech_tr(text: str) -> bytes:
+    """
+    Azure OpenAI TTS deployment (örn: 'tts') ile
+    text'ten ses (wav) üret.
+    """
     if not text.strip():
         raise ValueError("Cannot synthesize empty text.")
 
-    tmp_out = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-    tmp_out.close()
-
-    audio_config = speechsdk.audio.AudioOutputConfig(filename=tmp_out.name)
-    synthesizer = speechsdk.SpeechSynthesizer(
-        speech_config=speech_config,
-        audio_config=audio_config,
+    response = openai_client.audio.speech.create(
+        model=AZURE_OPENAI_TTS_DEPLOYMENT,   # deployment name: 'tts'
+        voice=AZURE_OPENAI_TTS_VOICE,        # örn: 'alloy'
+        input=text,
+        response_format="wav",               # frontend audio/wav bekliyor
     )
-    result = synthesizer.speak_text_async(text).get()
 
-    if result.reason != speechsdk.ResultReason.SynthesizingAudioCompleted:
-        raise RuntimeError(f"TTS failed: {result.reason}")
-
-    with open(tmp_out.name, "rb") as f:
-        audio_bytes = f.read()
-
-    try:
-        os.remove(tmp_out.name)
-    except OSError:
-        pass
-
+    audio_bytes = response.read()
+    response.close()
     return audio_bytes
 
 
@@ -285,7 +302,6 @@ class VoiceQAResponse(BaseModel):
 
 app = FastAPI(title="Azure Turkish Voice QA Agent")
 
-# CORS (frontend aynı origin'de çalışacağı için zaten sorun yok ama demo için açık)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -294,17 +310,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Frontend klasörü (Azure_Solution/frontend)
 FRONTEND_DIR = BASE_DIR / "frontend"
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 
 @app.get("/", response_class=FileResponse)
 def serve_index():
-    """
-    Root isteği geldiğinde ana HTML sayfayı döner.
-    http://127.0.0.1:8000 -> frontend/index.html
-    """
     index_path = FRONTEND_DIR / "index.html"
     if not index_path.exists():
         raise HTTPException(status_code=404, detail="index.html not found")
@@ -318,10 +329,6 @@ def health():
 
 @app.post("/text-qa", response_model=TextQAResponse)
 def text_qa(req: TextQARequest):
-    """
-    Metin tabanlı soru-cevap (RAG + LLM).
-    Frontend sendTextMessage burayı çağırıyor.
-    """
     if not req.question.strip():
         raise HTTPException(status_code=400, detail="Question is empty.")
 
@@ -332,11 +339,6 @@ def text_qa(req: TextQARequest):
 
 @app.post("/voice-qa", response_model=VoiceQAResponse)
 async def voice_qa(file: UploadFile = File(...)):
-    """
-    Ses tabanlı soru-cevap (ASR + RAG + TTS).
-    Frontend toggleRealTimeRecording -> processVoiceMessage burayı çağırıyor.
-    Form field adı: 'file'
-    """
     if not file.filename:
         raise HTTPException(status_code=400, detail="Audio file is required.")
 

@@ -688,6 +688,31 @@
         let audioChunks = [];
         let isRecording = false;
         let currentInputMode = 'text';
+        let audioUnlocked = false;
+
+        function unlockAudioOnce() {
+            if (audioUnlocked) return;
+
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                const ctx = new AudioContext();
+
+                const osc = ctx.createOscillator();
+                osc.frequency.value = 1;  // çok düşük frekans, duymayacaksın bile
+                osc.connect(ctx.destination);
+                osc.start();
+
+                setTimeout(() => {
+                    osc.stop();
+                    ctx.close();
+                }, 50); // 50ms
+
+                audioUnlocked = true;
+                console.log("Audio autoplay izni kilidi açıldı.");
+            } catch (e) {
+                console.log("Audio unlock başarısız:", e);
+            }
+        }
 
         function toggleApiConfig() {
             document.getElementById('apiConfig').classList.toggle('show');
@@ -712,7 +737,7 @@
             }
         }
 
-        function addMessage(type, content, audioBase64 = null, contexts = null) {
+        function addMessage(type, content, audioUrl = null, contexts = null) {
             const messagesDiv = document.getElementById('chatMessages');
             const welcome = messagesDiv.querySelector('.welcome-message');
             if (welcome) welcome.remove();
@@ -728,13 +753,15 @@
             contentDiv.className = 'message-content';
             contentDiv.textContent = content;
 
-            if (audioBase64) {
+            // Yeniden dinlemek için balon içine player koy
+            if (audioUrl) {
                 const audioDiv = document.createElement('div');
                 audioDiv.className = 'message-audio';
+
                 const audio = document.createElement('audio');
                 audio.controls = true;
-                const audioBlob = base64ToBlob(audioBase64, 'audio/wav');
-                audio.src = URL.createObjectURL(audioBlob);
+                audio.src = audioUrl;  // data:audio/wav;base64,....
+
                 audioDiv.appendChild(audio);
                 contentDiv.appendChild(audioDiv);
             }
@@ -845,6 +872,9 @@
                     visualizer.classList.remove('active');
                 }
             } else {
+                // 🔓 İlk tıklamada audio autoplay kilidini aç
+                unlockAudioOnce();
+
                 // Kaydı başlat
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -900,18 +930,38 @@
 
                 const data = await response.json();
                 hideTypingIndicator();
-                
-                // İlk mesaj: Anlaşılan metin
+
+                console.log('voice-qa response:', data);
+
+                // 1) Transcript'i göster
                 addMessage('assistant', `🎤 Anladım: "${data.transcript}"`);
-                
-                // İkinci mesaj: Yanıt ve ses
+
+                // 2) Base64'ten doğrudan DATA URL oluştur
+                const dataUrl = `data:audio/wav;base64,${data.audio_base64}`;
+
+                // 3) Tek bir Audio nesnesiyle otomatik çalmayı dene
+                try {
+                    const audio = new Audio(dataUrl);
+                    audio.play().catch(err => {
+                        console.log('Autoplay engellendi veya play() hatası:', err);
+                        // Engellenirse kullanıcı balondaki player'dan manuel oynatabilir
+                    });
+                } catch (e) {
+                    console.log('Audio oluştururken hata:', e);
+                }
+
+                // 4) Cevabı balonda göster + player (yeniden dinlemek için)
                 setTimeout(() => {
-                    addMessage('assistant', data.answer, data.audio_base64);
+                    addMessage('assistant', data.answer, dataUrl);
                 }, 300);
+
+                status.textContent = 'Konuşmak için butona basın';
 
             } catch (error) {
                 hideTypingIndicator();
+                console.error(error);
                 showError(`Hata: ${error.message}`);
+                status.textContent = 'Bir hata oluştu, tekrar deneyin';
             }
         }
 
@@ -938,5 +988,8 @@
             this.style.height = Math.min(this.scrollHeight, 120) + 'px';
         });
     </script>
+
+    <!-- Global audio player (otomatik oynatma için) -->
+    <audio id="globalVoicePlayer" style="display:none"></audio>
 </body>
 </html>

@@ -18,8 +18,8 @@ class GuardrailResult:
     reasons: Dict[str, bool]
 
 
-# Basit keyword listeleri
-# Not: Buraya gerçek küfür/hakaretleri sen ekleyebilirsin.
+
+#Buraya gerçek küfür/hakaretleri sen ekleyebilirsin.
 PROFANITY_KEYWORDS: List[str] = [
     # "örnek_küfür_1",
     # "örnek_küfür_2",
