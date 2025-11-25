@@ -347,12 +347,3 @@ Görüşme/demoda gösterebileceğin akış:
 * Whisper transcript kalitesi, mikrofona, konuşma hızına ve gürültüye bağlıdır;
   gerekirse ASR tarafında ek temizlik yapılabilir.
 
----
-
-Her şey bu kadar 🎧
-Projeyi çalıştırdıktan sonra tek yapman gereken `http://127.0.0.1:8000`’i açıp metin veya sesli soru sormak.
-Case sunumunda bu README’yi de ekleyerek mimari ve tasarım kararlarını net bir şekilde anlatabilirsin.
-
-```
-::contentReference[oaicite:0]{index=0}
-```
