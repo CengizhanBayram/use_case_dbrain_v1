@@ -6,4 +6,6 @@ faiss-cpu
 sentence-transformers
 python-dotenv
 requests
+audio_recorder_streamlit
+streamlit
 # ek paketler: openai, tts kütüphaneleri vs. ihtiyaca göre ekleyin
