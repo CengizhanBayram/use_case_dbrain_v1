@@ -100,6 +100,10 @@ def init_session_state():
     if "last_mic_audio" not in st.session_state:
         st.session_state.last_mic_audio = None  # type: Optional[bytes]
 
+    # Sesli sorular için son bağlam bilgisi
+    st.session_state.setdefault("last_voice_retrieved_docs", [])   # type: List[str]
+    st.session_state.setdefault("last_voice_source", None)         # "file" veya "mic"
+
     # RAG ayarları için varsayılanlar
     st.session_state.setdefault("top_k", 3)
     st.session_state.setdefault("enlarge_factor", 3)
@@ -181,6 +185,7 @@ def rewrite_query_if_enabled(raw_query: str) -> str:
 Kullanıcının orijinal sorusu:
 
 \"\"\"{raw_query}\"\"\"
+
 
 GÖREVİN:
 - Bu soruyu daha net, kısa ve bilgi aramaya uygun bir Türkçe cümleye dönüştür.
@@ -423,6 +428,10 @@ def handle_voice_question(audio_file) -> None:
     st.session_state.chat_history.append((user_display, answer))
     st.session_state.last_answer = answer
 
+    # Bu sesli soru için bağlam bilgisini state'e yaz
+    st.session_state.last_voice_retrieved_docs = retrieved_docs
+    st.session_state.last_voice_source = "file"
+
     # (c) TTS (oto + spinner)
     with st.spinner("🔊 Cevap için ses üretiliyor..."):
         run_tts_for_answer(answer)
@@ -515,6 +524,10 @@ def handle_voice_bytes(audio_bytes: bytes) -> None:
     user_display = f"🎙️ (Mikrofon) {transcript}"
     st.session_state.chat_history.append((user_display, answer))
     st.session_state.last_answer = answer
+
+    # Bu sesli soru için bağlam bilgisini state'e yaz
+    st.session_state.last_voice_retrieved_docs = retrieved_docs
+    st.session_state.last_voice_source = "mic"
 
     # (c) TTS (oto + spinner)
     with st.spinner("🔊 Cevap için ses üretiliyor..."):
@@ -685,6 +698,23 @@ def main():
             st.markdown("---")
             st.markdown("**Son ASR Transcript:**")
             st.code(st.session_state.last_transcript, language="text")
+
+            # Sesli soru için kullanılan bağlamı göster
+            if (
+                st.session_state.last_voice_retrieved_docs
+                and len(st.session_state.last_voice_retrieved_docs) > 0
+            ):
+                source = st.session_state.last_voice_source
+                source_label = "dosyadan yüklenen ses" if source == "file" else "mikrofondan gelen ses"
+                st.markdown(f"**Bu sesli soru için kullanılan bağlam ({source_label}):**")
+                with st.expander("Retrieval pasajları (sesli soru)", expanded=False):
+                    st.markdown(
+                        f"**Soru (ASR transcript):** `{st.session_state.last_transcript}`"
+                    )
+                    for i, p in enumerate(
+                        st.session_state.last_voice_retrieved_docs, start=1
+                    ):
+                        st.markdown(f"**[{i}]** {p}")
 
     # --- Chat Alanı ---
     with col_chat:
