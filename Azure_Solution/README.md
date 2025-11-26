@@ -6,7 +6,7 @@ Aynen şimdi bu hale geldiğine göre README’yi yazalım. Aşağıyı direkt `
 
 ---
 
-````markdown
+
 # Azure Türkçe Voice-based Q&A Agent (ASR + RAG + TTS)
 
 Bu proje, **Türkçe haber transkriptlerinden** oluşturulmuş bir bilgi tabanı üzerinde çalışan, uçtan uca **ses tabanlı soru-cevap (voice-based Q&A) ajanı**dır.
