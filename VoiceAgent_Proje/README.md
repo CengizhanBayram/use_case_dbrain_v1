@@ -1,4 +1,4 @@
-````markdown
+
 # 🎙️ Türkçe Voice Agent (ASR + RAG + TTS)
 
 Bu proje, **OpenSLR 108 – Turkish Broadcast News Speech** verisindeki transcript’lerden bir **knowledge base** kurup, bu bilgi tabanı üzerinden çalışan **Türkçe bir voice-based question answering agent** geliştirmek için hazırlandı.
@@ -41,7 +41,6 @@ Ek olarak:
 - **Guardrails**: Cevaplar üzerinde basit güvenlik ve içerik filtreleri uygulanır.  
 - **JSONL Loglama**: Her etkileşim `logs/interaction_log.jsonl` dosyasına kaydedilir (soru, transcript, cevap, kullanılan pasajlar, TTS süreleri, guardrail kararları vb.).
 
----
 
 ## 🧱 Kullanılan Teknolojiler
 
